@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Parch Kernel Manager
+Comment=Manage kernels on Parch GNU/Linux
+Exec=parch-kernel-manager
+Icon=com.parchlinux.kernelmanager
+Terminal=false
+Type=Application
+Categories=System;Utility;
+StartupNotify=true
