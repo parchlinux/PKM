@@ -23,9 +23,6 @@ class ParchKernelManager(Adw.Application):
             application_id='com.parchlinux.kernelmanager',
             flags=Gio.ApplicationFlags.FLAGS_NONE,
         )
-        Gtk.Settings.get_default().set_property(
-            'gtk-application-prefer-dark-theme', False
-        )
         self.window = None
         self.connect('startup', self._on_startup)
         self.connect('activate', self._on_activate)
@@ -48,11 +45,11 @@ class ParchKernelManager(Adw.Application):
         return missing
 
     def _show_dependency_error(self, missing):
-        cmd_list = '\n'.join(f'  \u2022 {cmd}' for cmd in missing)
+        commands = '\n'.join(f'  • {cmd}' for cmd in missing)
         dialog = Adw.AlertDialog.new(
-            _('Missing Dependencies'),
-            _('The following required commands were not found:\n{}\n\n'
-              'Please install them and try again.').format(cmd_list),
+            _('Missing Required Programs'),
+            _('The following commands are required but not found:\n\n{}\n\n'
+              'Please install them using:\nsudo pacman -S pacman polkit').format(commands),
         )
         dialog.add_response('quit', _('Quit'))
         dialog.set_default_response('quit')

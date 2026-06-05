@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "parch-kernel-manager"
-version = "0.1.0"
+version = "1.0.0"
 description = "A modern kernel management application for Parch GNU/Linux"
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
@@ -16,7 +16,7 @@ parch-kernel-manager = "pkm.app:main"
 
 [project.urls]
 Homepage = "https://parchlinux.com"
-Issues = "https://github.com/parchlinux/kernel-manager/issues"
+Issues = "https://github.com/parchlinux/PKM/issues"
 
 [tool.setuptools.packages.find]
 include = ["pkm*"]
@@ -24,3 +24,4 @@ include = ["pkm*"]
 [tool.setuptools.data-files]
 "share/applications" = ["data/com.parchlinux.kernelmanager.desktop"]
 "share/icons/hicolor/scalable/apps" = ["data/com.parchlinux.kernelmanager.svg"]
+"share/icons/hicolor/48x48/apps" = ["data/app-icon.png"]
