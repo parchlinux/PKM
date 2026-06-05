@@ -2,7 +2,7 @@
 # Contributor: Sohrab
 
 pkgname=parch-kernel-manager
-pkgver=0.1.0
+pkgver=1.0.0
 pkgrel=1
 pkgdesc='Manage Linux kernels on Parch GNU/Linux and Arch-based distributions'
 arch=('any')
