@@ -1,0 +1,355 @@
+# Persian translations for Parch Kernel Manager.
+# Copyright (C) 2026 Parch Linux Developers
+# This file is distributed under the same license as the parch-kernel-manager package.
+# Parch Linux Developers <info@parchlinux.com>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: parch-kernel-manager 1.1.0\n"
+"Report-Msgid-Bugs-To: https://github.com/parchlinux/pkm/issues\n"
+"POT-Creation-Date: 2026-07-26 21:00+0330\n"
+"PO-Revision-Date: 2026-07-26 21:00+0330\n"
+"Last-Translator: Parch Linux Team <info@parchlinux.com>\n"
+"Language-Team: Persian <fa@li.org>\n"
+"Language: fa\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "Parch Kernel Manager"
+msgstr "مدیریت هسته پارچ"
+
+msgid "A modern kernel management application for Parch GNU/Linux"
+msgstr "برنامه‌ای مدرن برای مدیریت هسته در پارچ گنو/لینوکس"
+
+msgid "Compile Custom Kernel"
+msgstr "کامپایل هسته سفارشی"
+
+msgid "Clean Orphaned Modules"
+msgstr "پاک‌سازی ماژول‌های رهاشده"
+
+msgid "Refresh Kernel List"
+msgstr "به‌روزرسانی فهرست هسته‌ها"
+
+msgid "About Kernel Manager"
+msgstr "درباره مدیریت هسته"
+
+msgid "Currently Booted Kernel"
+msgstr "هسته در حال اجرا"
+
+msgid "Discovering Kernels"
+msgstr "در حال شناسایی هسته‌ها"
+
+msgid "Scanning repositories and installed packages"
+msgstr "در حال اسکن مخازن و بسته‌های نصب‌شده"
+
+msgid "Could Not Load Kernels"
+msgstr "خطا در بارگیری هسته‌ها"
+
+msgid "Search kernel packages by name, version, or description..."
+msgstr "جستجوی بسته‌های هسته با نام، نسخه یا توضیحات..."
+
+msgid "All"
+msgstr "همه"
+
+msgid "Installed"
+msgstr "نصب‌شده"
+
+msgid "Available"
+msgstr "موجود در مخازن"
+
+msgid "LTS"
+msgstr "پشتیبانی بلندمدت (LTS)"
+
+msgid "Zen / RT"
+msgstr "عملکرد (Zen / RT)"
+
+msgid "Installed Kernels"
+msgstr "هسته‌های نصب‌شده"
+
+msgid "Available Kernels"
+msgstr "هسته‌های موجود"
+
+msgid "No Kernels Match Your Filter"
+msgstr "هیچ هسته‌ای با فیلتر شما مطابقت ندارد"
+
+msgid "Try adjusting your search term or filter category"
+msgstr "عبارت جستجو یا دسته‌بندی فیلتر را تغییر دهید"
+
+msgid "Running"
+msgstr "در حال اجرا"
+
+msgid "Active"
+msgstr "فعال"
+
+msgid "Default"
+msgstr "پیش‌فرض"
+
+msgid "View Details"
+msgstr "مشاهده جزئیات"
+
+msgid "Remove"
+msgstr "حذف"
+
+msgid "Install"
+msgstr "نصب"
+
+msgid "Set as Default Kernel"
+msgstr "تنظیم به عنوان هسته پیش‌فرض"
+
+msgid "Make Default"
+msgstr "تنظیم پیش‌فرض"
+
+msgid "Set this kernel as the default entry in GRUB/systemd-boot"
+msgstr "تنظیم این هسته به عنوان گزینه پیش‌فرض در GRUB/systemd-boot"
+
+msgid "Package and System Information"
+msgstr "اطلاعات بسته و سیستم"
+
+msgid "Status"
+msgstr "وضعیت"
+
+msgid "Available in Repository"
+msgstr "موجود در مخازن"
+
+msgid "Installed Package Size"
+msgstr "حجم بسته نصب‌شده"
+
+msgid "Build Date"
+msgstr "تاریخ ساخت"
+
+msgid "Kernel Headers"
+msgstr "هدرهای هسته"
+
+msgid "Not Installed"
+msgstr "نصب‌نشده"
+
+msgid "Modules Directory"
+msgstr "مسیر ماژول‌ها"
+
+msgid "DKMS Out-of-Tree Drivers"
+msgstr "درایورهای DKMS"
+
+msgid "Kernel Boot Parameters (/proc/cmdline)"
+msgstr "پارامترهای بوت هسته (/proc/cmdline)"
+
+msgid "System Module Cleaner"
+msgstr "پاک‌کننده ماژول‌های سیستم"
+
+msgid "System Clean"
+msgstr "سیستم پاک است"
+
+msgid "No orphaned kernel module folders found in /usr/lib/modules/"
+msgstr "هیچ پوشه ماژول بدون استفاده‌ای در /usr/lib/modules/ یافت نشد"
+
+msgid "Orphaned Kernel Modules"
+msgstr "ماژول‌های هسته رهاشده"
+
+msgid "The following module folders in /usr/lib/modules/ belong to kernels that are no longer installed on your system:"
+msgstr "پوشه‌های ماژول زیر در /usr/lib/modules/ متعلق به هسته‌هایی هستند که دیگر روی سیستم شما نصب نیستند:"
+
+msgid "Orphaned Folders"
+msgstr "پوشه‌های رهاشده"
+
+msgid "Clean Selected Modules"
+msgstr "پاک‌سازی ماژول‌های انتخاب‌شده"
+
+msgid "Cleaning Orphaned Modules"
+msgstr "در حال پاک‌سازی ماژول‌های رهاشده"
+
+msgid "Missing Required Programs"
+msgstr "برنامه‌های مورد نیاز یافت نشدند"
+
+msgid "The following commands are required but not found:\n\n{}\n\nPlease install them using:\nsudo pacman -S pacman polkit"
+msgstr "دستورات زیر مورد نیاز هستند اما یافت نشدند:\n\n{}\n\nلطفاً آن‌ها را با دستور زیر نصب کنید:\nsudo pacman -S pacman polkit"
+
+msgid "Quit"
+msgstr "خروج"
+
+msgid "Close"
+msgstr "بستن"
+
+msgid "Cancel"
+msgstr "انصراف"
+
+msgid "Operation in Progress"
+msgstr "عملیات در حال انجام است"
+
+msgid "An install or remove operation is running.\nClosing will interrupt it."
+msgstr "عملیات نصب یا حذف در حال اجرا است.\nبستن برنامه آن را متوقف خواهد کرد."
+
+msgid "Close Anyway"
+msgstr "بستن در هر صورت"
+
+msgid "Install {}?"
+msgstr "نصب {}؟"
+
+msgid "This will install {} version {} on your system.\nThe installation may take several minutes."
+msgstr "این کار نسخه {} از {} را روی سیستم شما نصب می‌کند.\nنصب ممکن است چند دقیقه طول بکشد."
+
+msgid "Remove {}?"
+msgstr "حذف {}؟"
+
+msgid "This will remove {} version {} from your system."
+msgstr "این کار نسخه {} از {} را از سیستم شما حذف خواهد کرد."
+
+msgid "Cannot Remove Kernel"
+msgstr "عدم امکان حذف هسته"
+
+msgid "You must have at least one kernel installed on your system."
+msgstr "حداقل یک هسته باید روی سیستم شما نصب باشد."
+
+msgid "Installing {}..."
+msgstr "در حال نصب {}..."
+
+msgid "Removing {}..."
+msgstr "در حال حذف {}..."
+
+msgid "{} {} successfully"
+msgstr "{} با موفقیت {} شد"
+
+msgid "installed"
+msgstr "نصب"
+
+msgid "removed"
+msgstr "حذف"
+
+msgid "Operation failed (exit code {})"
+msgstr "عملیات با خطا مواجه شد (کد خروج {})"
+
+msgid "Refresh failed: {}"
+msgstr "به‌روزرسانی ناموفق بود: {}"
+
+msgid "Custom kernel compiled and installed successfully!"
+msgstr "هسته سفارشی با موفقیت کامپایل و نصب شد!"
+
+msgid "Kernel compilation failed or was cancelled"
+msgstr "کامپایل هسته ناموفق بود یا لغو شد"
+
+msgid "Set {} as default boot kernel!"
+msgstr "{} به عنوان هسته پیش‌فرض بوت تنظیم شد!"
+
+msgid "Failed to set default kernel: {}"
+msgstr "خطا در تنظیم هسته پیش‌فرض: {}"
+
+msgid "Setup"
+msgstr "راه‌اندازی"
+
+msgid "Configure"
+msgstr "پیکربندی"
+
+msgid "Build and install kernel from source"
+msgstr "ساخت و نصب هسته از سورس کد"
+
+msgid "Source Code"
+msgstr "سورس کد"
+
+msgid "Kernel Source Directory"
+msgstr "مسیر سورس کد هسته"
+
+msgid "Path to Linux kernel source code"
+msgstr "مسیر کدهای منبع هسته لینوکس"
+
+msgid "Browse"
+msgstr "مرور..."
+
+msgid "Validation Status"
+msgstr "وضعیت اعتبارسنجی"
+
+msgid "Bootloader"
+msgstr "بوت‌لودر"
+
+msgid "Not detected"
+msgstr "شناسایی نشد"
+
+msgid "Build Dependencies"
+msgstr "پیش‌نیازهای ساخت"
+
+msgid "Checking..."
+msgstr "در حال بررسی..."
+
+msgid "Next"
+msgstr "بعدی"
+
+msgid "Back"
+msgstr "قبلی"
+
+msgid "Compile"
+msgstr "کامپایل"
+
+msgid "Kernel Config"
+msgstr "پیکربندی هسته"
+
+msgid "Default config (defconfig)"
+msgstr "پیکربندی پیش‌فرض (defconfig)"
+
+msgid "Current kernel config"
+msgstr "پیکربندی هسته فعلی"
+
+msgid "Custom config file"
+msgstr "فایل پیکربندی سفارشی"
+
+msgid "Gaming & Low-Latency Preset"
+msgstr "پری‌ست گیمینگ و تاخیر کم"
+
+msgid "Battery & Power Saver Preset"
+msgstr "پری‌ست بهینه‌سازی مصرف باتری"
+
+msgid "Version Suffix"
+msgstr "پسوند نسخه"
+
+msgid "Update Method"
+msgstr "روش به‌روزرسانی"
+
+msgid "Auto-detect"
+msgstr "تشخیص خودکار"
+
+msgid "Skip"
+msgstr "صرف‌نظر"
+
+msgid "Kernel Version"
+msgstr "نسخه هسته"
+
+msgid "Will be detected"
+msgstr "تشخیص داده خواهد شد"
+
+msgid "Build Time"
+msgstr "زمان ساخت"
+
+msgid "30-90 minutes"
+msgstr "۳۰ تا ۹۰ دقیقه"
+
+msgid "Process"
+msgstr "مراحل"
+
+msgid "Compile → Install modules → Create initramfs → Update bootloader"
+msgstr "کامپایل ← نصب ماژول‌ها ← ساخت initramfs ← به‌روزرسانی بوت‌لودر"
+
+msgid "Start Kernel Compilation?"
+msgstr "شروع کامپایل هسته؟"
+
+msgid "Installing Dependencies"
+msgstr "در حال نصب پیش‌نیازها"
+
+msgid "All required packages installed"
+msgstr "تمام بسته‌های مورد نیاز نصب شده‌اند"
+
+msgid "Dependencies"
+msgstr "پیش‌نیازها"
+
+msgid "Missing: {}"
+msgstr "کمبود بسته‌ها: {}"
+
+msgid "Install Build Dependencies?"
+msgstr "نصب پیش‌نیازهای ساخت؟"
+
+msgid "Installation Complete"
+msgstr "نصب کامل شد"
+
+msgid "Build dependencies have been installed successfully."
+msgstr "پیش‌نیازهای ساخت با موفقیت نصب شدند."
+
+msgid "<p>Parch Kernel Manager 1.1.0 release notes:</p><ul><li>Default Bootloader Kernel Selector (GRUB and systemd-boot)</li><li>Extended Kernel Specifications and DKMS Inspector</li><li>System Module Cleaner for orphaned /usr/lib/modules/ directories</li><li>Search and Category Filtering (All, Installed, Available, LTS, Zen/RT)</li><li>Custom Kernel Compilation Presets (Gaming and Low-Latency, Battery Saver)</li><li>Native Gettext Localization and Persian (fa) Language Support</li><li>GNOME HIG and LibAdwaita UI Revamp</li></ul>"
+msgstr "<p>یادداشت‌های انتشار نسخه ۱.۱.۰ مدیریت هسته پارچ:</p><ul><li>انتخاب‌گر هسته پیش‌فرض بوت‌لودر (GRUB و systemd-boot)</li><li>مشخصات پیشرفته هسته و بررسی‌کننده درایورهای DKMS</li><li>پاک‌کننده ماژول‌های رهاشده سیستم در مسیر /usr/lib/modules/</li><li>جستجو و فیلتر دسته‌بندی (همه، نصب‌شده، موجود، LTS، Zen/RT)</li><li>پری‌ست‌های کامپایل هسته سفارشی (گیمینگ با تاخیر کم، بهینه‌سازی باتری)</li><li>بومی‌سازی gettext و پشتیبانی کامل از زبان فارسی</li><li>بازطراحی رابط کاربری طبق راهنمای طراحی گنوم (GNOME HIG) و LibAdwaita</li></ul>"
+

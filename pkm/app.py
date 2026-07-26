@@ -10,8 +10,8 @@ from gi.repository import Gtk, Adw, Gio, GLib
 from .window import MainWindow
 
 
-def _(s):
-    return s
+from .i18n import _
+
 
 
 _REQUIRED_COMMANDS = ['pacman', 'pkexec', 'uname']
@@ -24,18 +24,18 @@ class ParchKernelManager(Adw.Application):
             flags=Gio.ApplicationFlags.FLAGS_NONE,
         )
         self.window = None
+        self.missing_dependencies = []
         self.connect('startup', self._on_startup)
         self.connect('activate', self._on_activate)
 
     def _on_startup(self, app):
-        missing = self._check_dependencies()
-        if missing:
-            GLib.idle_add(self._show_dependency_error, missing)
-            return
+        self.missing_dependencies = self._check_dependencies()
 
         about_action = Gio.SimpleAction.new('about', None)
         about_action.connect('activate', self._on_about)
         self.add_action(about_action)
+
+
 
     def _check_dependencies(self):
         missing = []
@@ -68,6 +68,9 @@ class ParchKernelManager(Adw.Application):
         if not self.window:
             self.window = MainWindow(application=self)
         self.window.present()
+        if self.missing_dependencies:
+            self._show_dependency_error(self.missing_dependencies)
+
 
 
 def main():

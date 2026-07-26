@@ -19,8 +19,8 @@ from .custom_kernel import (
 from .terminal_dialog import TerminalDialog
 
 
-def _(s):
-    return s
+from .i18n import _
+
 
 
 class CustomKernelDialog(Adw.Window):
@@ -195,12 +195,16 @@ class CustomKernelDialog(Adw.Window):
         self.config_method_row = Adw.ComboRow()
         self.config_method_row.set_title(_('Kernel Config'))
         config_model = Gtk.StringList()
-        config_model.append(_('Default config'))
+        config_model.append(_('Default config (defconfig)'))
         config_model.append(_('Current kernel config'))
         config_model.append(_('Custom config file'))
+        config_model.append(_('Gaming & Low-Latency Preset'))
+        config_model.append(_('Battery & Power Saver Preset'))
+
         self.config_method_row.set_model(config_model)
         self.config_method_row.set_selected(0)
         config_group.add(self.config_method_row)
+
         
         self.localversion_row = Adw.EntryRow()
         self.localversion_row.set_title(_('Version Suffix'))
@@ -529,6 +533,7 @@ class CustomKernelDialog(Adw.Window):
             return
         
         config_file = None
+        preset = None
         selected = self.config_method_row.get_selected()
         
         if selected == 1:
@@ -536,6 +541,10 @@ class CustomKernelDialog(Adw.Window):
             if not Path(config_file).exists():
                 kernel_ver = subprocess.check_output(['uname', '-r'], timeout=5).decode().strip()
                 config_file = f'/boot/config-{kernel_ver}'
+        elif selected == 3:
+            preset = 'gaming'
+        elif selected == 4:
+            preset = 'battery'
         
         localversion = self.localversion_row.get_text().strip()
         
@@ -548,11 +557,15 @@ class CustomKernelDialog(Adw.Window):
         }
         bootloader = bootloader_map.get(bootloader_selection, 'auto')
         
-        script_content = create_build_script(self.source_dir, config_file, localversion, bootloader)
+        script_content = create_build_script(self.source_dir, config_file, localversion, bootloader, preset=preset)
+
         
-        script_path = Path('/tmp/kernel-compile.sh')
-        script_path.write_text(script_content)
-        script_path.chmod(0o755)
+        import tempfile
+        with tempfile.NamedTemporaryFile('w', prefix='pkm-build-', suffix='.sh', delete=False) as tf:
+            tf.write(script_content)
+            script_path = Path(tf.name)
+        script_path.chmod(0o700)
+
         
         class CompileKernel:
             def __init__(self):
