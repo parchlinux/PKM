@@ -25,8 +25,9 @@ makedepends=(
   'gettext'
   'git'
 )
-source=("$pkgname::git+https://github.com/parchlinux/pkm.git")
+source=("$pkgname::git+https://github.com/parchlinux/pkm.git#tag=v$pkgver")
 sha256sums=('SKIP')
+
 
 build() {
   cd "$srcdir/$pkgname"
