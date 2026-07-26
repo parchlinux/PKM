@@ -4,8 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "parch-kernel-manager"
-version = "1.0.0"
+version = "1.1.0"
 description = "A modern kernel management application for Parch GNU/Linux"
+
 readme = "README.md"
 license = {text = "AGPL-3.0-or-later"}
 requires-python = ">=3.9"

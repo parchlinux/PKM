@@ -148,27 +148,37 @@ def check_build_dependencies():
     return missing
 
 
-def create_build_script(source_dir, config_file=None, localversion='', bootloader='auto'):
-    source_dir = Path(source_dir).resolve()
+import os
+import shlex
+import subprocess
+from pathlib import Path
+
+
+def create_build_script(source_dir, config_file=None, localversion='', bootloader='auto', preset=None):
+    source_dir_quoted = shlex.quote(str(Path(source_dir).resolve()))
+    config_file_quoted = shlex.quote(str(config_file)) if config_file else None
+    clean_localver = localversion.strip().lstrip('-')
+    localversion_quoted = shlex.quote(clean_localver)
+    bootloader_quoted = shlex.quote(str(bootloader))
     
     script_lines = [
         '#!/bin/bash',
-        'set -e',
+        'set -eo pipefail',
         '',
         'echo "================================================"',
         'echo "  Custom Kernel Compilation Script"',
         'echo "================================================"',
         'echo ""',
         '',
-        f'cd "{source_dir}"',
+        f'cd {source_dir_quoted}',
         '',
         'echo "==> Step 1/6: Configuring kernel..."',
     ]
     
-    if config_file and Path(config_file).exists():
+    if config_file_quoted:
         script_lines.extend([
-            f'if [ -f "{config_file}" ]; then',
-            f'    cp "{config_file}" .config',
+            f'if [ -f {config_file_quoted} ]; then',
+            f'    cp {config_file_quoted} .config',
             '    echo "Using custom config file"',
             'else',
             '    make defconfig',
@@ -177,17 +187,36 @@ def create_build_script(source_dir, config_file=None, localversion='', bootloade
         ])
     else:
         script_lines.append('make defconfig')
+
+    if preset == 'gaming':
+        script_lines.extend([
+            'echo "Applying Gaming & Low-Latency preset..."',
+            'if [ -f scripts/config ]; then',
+            '    ./scripts/config --enable CONFIG_HZ_1000 || true',
+            '    ./scripts/config --enable CONFIG_PREEMPT || true',
+            '    ./scripts/config --enable CONFIG_TCP_CONG_BBR || true',
+            'fi',
+        ])
+    elif preset == 'battery':
+        script_lines.extend([
+            'echo "Applying Battery & Power Saver preset..."',
+            'if [ -f scripts/config ]; then',
+            '    ./scripts/config --enable CONFIG_HZ_250 || true',
+            '    ./scripts/config --enable CONFIG_CPU_FREQ_STAT || true',
+            'fi',
+        ])
     
-    if localversion:
+    if clean_localver:
         script_lines.extend([
             '',
-            f'sed -i "s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION=\\"-{localversion}\\"/" .config || true',
-            f'echo "CONFIG_LOCALVERSION=\\"-{localversion}\\"" >> .config',
+            f'sed -i "s/CONFIG_LOCALVERSION=.*/CONFIG_LOCALVERSION=\\"-{clean_localver}\\"/" .config 2>/dev/null || true',
+            f'grep -q "CONFIG_LOCALVERSION=" .config || echo "CONFIG_LOCALVERSION=\\"-{clean_localver}\\"" >> .config',
         ])
+
     
     script_lines.extend([
         '',
-        'KERNEL_VERSION=$(make kernelversion)',
+        'KERNEL_VERSION=$(make -s kernelversion 2>/dev/null || make kernelversion)',
         'echo "Building kernel version: $KERNEL_VERSION"',
         'echo ""',
         '',
@@ -209,13 +238,27 @@ def create_build_script(source_dir, config_file=None, localversion='', bootloade
         'echo ""',
         'echo "==> Step 4/6: Installing kernel image..."',
         '',
-        'KERNEL_IMAGE="arch/x86/boot/bzImage"',
-        'if [ ! -f "$KERNEL_IMAGE" ]; then',
+        'ARCH=$(uname -m)',
+        'case "$ARCH" in',
+        '    x86_64) KERNEL_IMAGE="arch/x86/boot/bzImage" ;;',
+        '    aarch64|arm64) KERNEL_IMAGE="arch/arm64/boot/Image.gz" ;;',
+        '    riscv64) KERNEL_IMAGE="arch/riscv/boot/Image.gz" ;;',
+        '    *) KERNEL_IMAGE=$(find arch/ -type f \\( -name bzImage -o -name Image.gz -o -name Image -o -name zImage \\) 2>/dev/null | head -n 1) ;;',
+
+        'esac',
+        '',
+        'if [ -z "$KERNEL_IMAGE" ] || [ ! -f "$KERNEL_IMAGE" ]; then',
         '    echo "ERROR: Kernel image not found at $KERNEL_IMAGE"',
         '    exit 1',
         'fi',
         '',
-        'INSTALL_VERSION="${KERNEL_VERSION}' + (f'-{localversion}' if localversion else '') + '"',
+        'INSTALL_VERSION="$KERNEL_VERSION"',
+        f'if [ -n "{clean_localver}" ]; then',
+        f'    if [[ "$INSTALL_VERSION" != *"-{clean_localver}" ]]; then',
+        f'        INSTALL_VERSION="${{INSTALL_VERSION}}-{clean_localver}"',
+        '    fi',
+        'fi',
+        '',
         'cp -v "$KERNEL_IMAGE" "/boot/vmlinuz-${INSTALL_VERSION}"',
         'cp -v System.map "/boot/System.map-${INSTALL_VERSION}"',
         'cp -v .config "/boot/config-${INSTALL_VERSION}"',
@@ -240,12 +283,12 @@ def create_build_script(source_dir, config_file=None, localversion='', bootloade
         'echo ""',
         'echo "==> Step 6/6: Updating bootloader..."',
         '',
-        f'BOOTLOADER="{bootloader}"',
+        f'BOOTLOADER={bootloader_quoted}',
         '',
         'if [ "$BOOTLOADER" = "auto" ]; then',
         '    if command -v grub-mkconfig &>/dev/null && [ -f /boot/grub/grub.cfg ]; then',
         '        BOOTLOADER="grub"',
-        '    elif command -v bootctl &>/dev/null && [ -f /boot/loader/loader.conf ]; then',
+        '    elif command -v bootctl &>/dev/null && [ -d /boot/loader ]; then',
         '        BOOTLOADER="systemd-boot"',
         '    else',
         '        BOOTLOADER="unknown"',
@@ -256,52 +299,45 @@ def create_build_script(source_dir, config_file=None, localversion='', bootloade
         '    grub)',
         '        echo "Updating GRUB configuration..."',
         '        if grub-mkconfig -o /boot/grub/grub.cfg; then',
-        '            echo "✓ GRUB updated successfully"',
+        '            echo "[OK] GRUB updated successfully"',
         '        else',
-        '            echo "✗ ERROR: Failed to update GRUB"',
+        '            echo "[ERROR] Failed to update GRUB"',
         '            exit 1',
         '        fi',
         '        ;;',
         '    systemd-boot)',
         '        echo "Creating systemd-boot entry..."',
         '        BOOT_ENTRY="/boot/loader/entries/${INSTALL_VERSION}.conf"',
-        '        ROOT_PARTUUID=$(blkid -s PARTUUID -o value $(findmnt -n -o SOURCE /) 2>/dev/null)',
-        '        if [ -z "$ROOT_PARTUUID" ]; then',
-        '            ROOT_DEVICE=$(findmnt -n -o SOURCE /)',
-        '            echo "WARNING: Could not detect PARTUUID, using device: $ROOT_DEVICE"',
+        '        ROOT_DEVICE=$(findmnt -n -o SOURCE / | head -n 1)',
+        '        ROOT_PARTUUID=$(blkid -s PARTUUID -o value "$ROOT_DEVICE" 2>/dev/null || true)',
+        '        ROOT_UUID=$(blkid -s UUID -o value "$ROOT_DEVICE" 2>/dev/null || true)',
+        '        if [ -n "$ROOT_PARTUUID" ]; then',
+        '            ROOT_CMD="root=PARTUUID=$ROOT_PARTUUID"',
+        '        elif [ -n "$ROOT_UUID" ]; then',
+        '            ROOT_CMD="root=UUID=$ROOT_UUID"',
+        '        else',
+        '            ROOT_CMD="root=$ROOT_DEVICE"',
         '        fi',
         '        cat > "$BOOT_ENTRY" <<EOF',
         'title   Custom Kernel ${INSTALL_VERSION}',
         'linux   /vmlinuz-${INSTALL_VERSION}',
         'initrd  /initramfs-${INSTALL_VERSION}.img',
-        'options root=PARTUUID=${ROOT_PARTUUID:-UUID=$(blkid -s UUID -o value $ROOT_DEVICE)} rw',
+        'options ${ROOT_CMD} rw',
         'EOF',
         '        if [ -f "$BOOT_ENTRY" ]; then',
-        '            echo "✓ systemd-boot entry created: $BOOT_ENTRY"',
+        '            echo "[OK] systemd-boot entry created: $BOOT_ENTRY"',
         '            cat "$BOOT_ENTRY"',
         '        else',
-        '            echo "✗ ERROR: Failed to create boot entry"',
+        '            echo "[ERROR] Failed to create boot entry"',
         '            exit 1',
         '        fi',
+
         '        ;;',
         '    none)',
         '        echo "Skipping bootloader update (manual configuration selected)"',
-        '        echo ""',
-        '        echo "Kernel files installed:"',
-        '        echo "  - Kernel: /boot/vmlinuz-${INSTALL_VERSION}"',
-        '        echo "  - Initramfs: /boot/initramfs-${INSTALL_VERSION}.img"',
-        '        echo "  - Config: /boot/config-${INSTALL_VERSION}"',
-        '        echo ""',
-        '        echo "Please update your bootloader configuration manually."',
         '        ;;',
         '    *)',
         '        echo "WARNING: Unknown bootloader or no bootloader detected"',
-        '        echo "Installed files:"',
-        '        echo "  - Kernel: /boot/vmlinuz-${INSTALL_VERSION}"',
-        '        echo "  - Initramfs: /boot/initramfs-${INSTALL_VERSION}.img"',
-        '        echo "  - Config: /boot/config-${INSTALL_VERSION}"',
-        '        echo ""',
-        '        echo "Please update your bootloader manually."',
         '        ;;',
         'esac',
         '',
@@ -321,3 +357,4 @@ def create_build_script(source_dir, config_file=None, localversion='', bootloade
     ])
     
     return '\n'.join(script_lines)
+

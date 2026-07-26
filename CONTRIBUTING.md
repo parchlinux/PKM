@@ -20,7 +20,8 @@ discriminatory behavior will not be tolerated.
 - Use descriptive variable names (full words, not abbreviations)
 - Wrap user-facing strings with `_()` for i18n
 - Keep methods focused and under 50 lines where possible
-- Avoid CSS — use Adwaita widgets and built-in style classes
+- Avoid CSS - use Adwaita widgets and built-in style classes
+
 
 ## Architecture
 

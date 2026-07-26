@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
+import os
 import subprocess
 from pathlib import Path
+
+_PACMAN_ENV = {**os.environ, 'LC_ALL': 'C'}
 
 
 # Known kernel flavors always included when available
@@ -115,7 +118,7 @@ def _batch_get_descriptions(names, installed):
         try:
             output = subprocess.check_output(
                 ['pacman', '-Qi'] + installed_names,
-                stderr=subprocess.DEVNULL, timeout=30,
+                stderr=subprocess.DEVNULL, timeout=30, env=_PACMAN_ENV,
             ).decode()
             _parse_desc_batch(output, descs)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
@@ -126,7 +129,7 @@ def _batch_get_descriptions(names, installed):
         try:
             output = subprocess.check_output(
                 ['pacman', '-Si'] + avail_names,
-                stderr=subprocess.DEVNULL, timeout=30,
+                stderr=subprocess.DEVNULL, timeout=30, env=_PACMAN_ENV,
             ).decode()
             _parse_desc_batch(output, descs)
         except Exception:
@@ -151,7 +154,7 @@ def _get_description(name, installed):
     desc = ''
     try:
         cmd = ['pacman', '-Qi' if installed else '-Si', name]
-        output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=10).decode()
+        output = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=10, env=_PACMAN_ENV).decode()
         for line in output.splitlines():
             if line.startswith('Description '):
                 desc = line.split(':', 1)[1].strip()
@@ -164,7 +167,7 @@ def _get_description(name, installed):
 def _get_installed_packages():
     try:
         output = subprocess.check_output(
-            ['pacman', '-Q'], stderr=subprocess.DEVNULL, timeout=15
+            ['pacman', '-Q'], stderr=subprocess.DEVNULL, timeout=15, env=_PACMAN_ENV,
         ).decode()
         result = {}
         for line in output.splitlines():
@@ -179,7 +182,7 @@ def _get_installed_packages():
 def _get_available_packages():
     try:
         output = subprocess.check_output(
-            ['pacman', '-Sl'], stderr=subprocess.DEVNULL, timeout=15
+            ['pacman', '-Sl'], stderr=subprocess.DEVNULL, timeout=15, env=_PACMAN_ENV,
         ).decode()
         result = {}
         for line in output.splitlines():
@@ -189,6 +192,7 @@ def _get_available_packages():
         return result
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
         return {}
+
 
 
 def get_active_kernel_pkg():
@@ -207,3 +211,132 @@ def get_active_kernel_version():
         return subprocess.check_output(['uname', '-r'], timeout=5).decode().strip()
     except Exception:
         return 'Unknown'
+
+
+def get_dkms_status():
+    """Return a dict mapping kernel_version -> list of installed/building DKMS modules."""
+    dkms_map = {}
+    try:
+        output = subprocess.check_output(['dkms', 'status'], stderr=subprocess.DEVNULL, timeout=5, env=_PACMAN_ENV).decode()
+        for line in output.splitlines():
+            parts = [p.strip() for p in line.split(',')]
+            if len(parts) >= 3:
+                mod_name = parts[0]
+                kver_arch = parts[1]
+                status_str = parts[2]
+                kver = kver_arch.split()[0]
+                if kver not in dkms_map:
+                    dkms_map[kver] = []
+                dkms_map[kver].append({
+                    'module': mod_name,
+                    'status': status_str,
+                })
+    except Exception:
+        pass
+    return dkms_map
+
+
+def get_default_boot_kernel():
+    """Detect default booted kernel from bootloader config (systemd-boot or GRUB)."""
+    try:
+        # systemd-boot check
+        loader_conf = Path('/boot/loader/loader.conf')
+        if not loader_conf.exists():
+            loader_conf = Path('/boot/efi/loader/loader.conf')
+        if loader_conf.exists():
+            for line in loader_conf.read_text().splitlines():
+                if line.strip().startswith('default'):
+                    entry = line.split(maxsplit=1)[1].strip().replace('.conf', '')
+                    return entry
+        
+        # GRUB check
+        grub_default = Path('/etc/default/grub')
+        if grub_default.exists():
+            for line in grub_default.read_text().splitlines():
+                if line.startswith('GRUB_DEFAULT='):
+                    val = line.split('=', 1)[1].strip('"\': ')
+                    return val
+    except Exception:
+        pass
+    return ''
+
+
+def get_kernel_details(kernel_info):
+    """Retrieve extended information for a specific kernel."""
+    details = {
+        'name': kernel_info.name,
+        'version': kernel_info.version,
+        'installed': kernel_info.installed,
+        'headers_installed': False,
+        'installed_size': 'Unknown',
+        'build_date': 'Unknown',
+        'modules_dir': '',
+        'modules_size': 'Unknown',
+        'cmdline': '',
+    }
+    
+    headers_pkg = f"{kernel_info.name}-headers"
+    try:
+        subprocess.check_output(['pacman', '-Q', headers_pkg], stderr=subprocess.DEVNULL, timeout=3, env=_PACMAN_ENV)
+        details['headers_installed'] = True
+    except Exception:
+        details['headers_installed'] = False
+
+    if kernel_info.installed:
+        try:
+            out = subprocess.check_output(['pacman', '-Qi', kernel_info.name], stderr=subprocess.DEVNULL, timeout=5, env=_PACMAN_ENV).decode()
+            for line in out.splitlines():
+                if line.startswith('Installed Size '):
+                    details['installed_size'] = line.split(':', 1)[1].strip()
+                elif line.startswith('Build Date '):
+                    details['build_date'] = line.split(':', 1)[1].strip()
+        except Exception:
+            pass
+
+        # Find module directory
+        try:
+            modules_base = Path('/usr/lib/modules')
+            if modules_base.exists():
+                for d in modules_base.iterdir():
+                    if d.is_dir():
+                        pkgbase = d / 'pkgbase'
+                        if pkgbase.exists() and pkgbase.read_text().strip() == kernel_info.name:
+                            details['modules_dir'] = str(d)
+                            # Get size
+                            du_out = subprocess.check_output(['du', '-sh', str(d)], stderr=subprocess.DEVNULL, timeout=5).decode()
+                            details['modules_size'] = du_out.split()[0]
+                            break
+        except Exception:
+            pass
+
+    # Read current cmdline if active
+    cmdline_file = Path('/proc/cmdline')
+    if cmdline_file.exists():
+        details['cmdline'] = cmdline_file.read_text().strip()
+
+    return details
+
+
+def get_orphaned_modules(installed_kernels):
+    """Return list of module directories in /usr/lib/modules/ that do not match installed kernels."""
+    orphans = []
+    modules_dir = Path('/usr/lib/modules')
+    if not modules_dir.exists():
+        return orphans
+    
+    installed_pkgbases = {k.name for k in installed_kernels if k.installed}
+    
+    try:
+        for entry in modules_dir.iterdir():
+            if entry.is_dir():
+                pkgbase_file = entry / 'pkgbase'
+                if pkgbase_file.exists():
+                    pkg_name = pkgbase_file.read_text().strip()
+                    if pkg_name not in installed_pkgbases:
+                        orphans.append({'path': str(entry), 'name': pkg_name, 'dir_name': entry.name})
+                else:
+                    orphans.append({'path': str(entry), 'name': 'Unknown / Orphaned', 'dir_name': entry.name})
+    except Exception:
+        pass
+    return orphans
+

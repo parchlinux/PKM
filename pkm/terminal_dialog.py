@@ -10,8 +10,8 @@ gi.require_version('Vte', '3.91')
 from gi.repository import Gtk, Adw, GLib, Vte, Gio, Gdk
 
 
-def _(s):
-    return s
+from .i18n import _
+
 
 
 class TerminalDialog(Adw.Window):
@@ -85,6 +85,7 @@ class TerminalDialog(Adw.Window):
         )
 
     def _build_command(self):
+        pacman_env = {**os.environ, 'LC_ALL': 'C'}
         if self.install:
             cmd = [
                 'pkexec', 'pacman', '-S',
@@ -94,10 +95,10 @@ class TerminalDialog(Adw.Window):
             try:
                 subprocess.check_output(
                     ['pacman', '-Si', headers],
-                    stderr=subprocess.DEVNULL, timeout=10,
+                    stderr=subprocess.DEVNULL, timeout=2, env=pacman_env,
                 )
                 cmd.append(headers)
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
                 pass
             return cmd
 
@@ -109,10 +110,10 @@ class TerminalDialog(Adw.Window):
         try:
             subprocess.check_output(
                 ['pacman', '-Q', headers],
-                stderr=subprocess.DEVNULL, timeout=5,
+                stderr=subprocess.DEVNULL, timeout=2, env=pacman_env,
             )
             cmd.append(headers)
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
             pass
         return cmd
 
@@ -131,8 +132,14 @@ class TerminalDialog(Adw.Window):
                 pass
             self.child_pid = None
 
-        self._fire_callback(status)
+        try:
+            exit_code = os.waitstatus_to_exitcode(status)
+        except Exception:
+            exit_code = status
+
+        self._fire_callback(exit_code)
         self.close()
+
 
     def _fire_callback(self, status):
         if not self.callback_fired and self.on_complete:

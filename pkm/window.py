@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
+import subprocess
 import threading
+from pathlib import Path
 
 import gi
 gi.require_version('Gtk', '4.0')
@@ -10,25 +12,31 @@ from .kernels import (
     discover_kernels,
     get_active_kernel_pkg,
     get_active_kernel_version,
+    get_default_boot_kernel,
 )
 from .terminal_dialog import TerminalDialog
 from .custom_kernel_dialog import CustomKernelDialog
+from .kernel_details_dialog import KernelDetailsDialog
+from .orphan_cleaner_dialog import OrphanCleanerDialog
 
 
-def _(s):
-    return s
+from .i18n import _
+
 
 
 class MainWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.set_title(_('Kernel Manager'))
-        self.set_default_size(1000, 750)
+        self.set_title(_('Parch Kernel Manager'))
+        self.set_default_size(1050, 780)
 
         self.kernels = []
         self.active_kernel_pkg = ''
         self.active_kernel_version = ''
+        self.default_boot_kernel = ''
+        self.search_query = ''
+        self.active_filter = 'all'
         self.operation_in_progress = False
         self._force_close = False
         self._scrolled_window = None
@@ -45,12 +53,22 @@ class MainWindow(Adw.ApplicationWindow):
         toolbar_view = Adw.ToolbarView()
 
         header = Adw.HeaderBar()
+        
+        # Window Title
+        win_title = Adw.WindowTitle.new(_('Parch Kernel Manager'), _('v1.1.0'))
+        header.set_title_widget(win_title)
 
         compile_btn = Gtk.Button()
         compile_btn.set_icon_name('document-edit-symbolic')
         compile_btn.set_tooltip_text(_('Compile Custom Kernel'))
         compile_btn.connect('clicked', self.on_compile_custom)
         header.pack_start(compile_btn)
+
+        clean_btn = Gtk.Button()
+        clean_btn.set_icon_name('edit-clear-symbolic')
+        clean_btn.set_tooltip_text(_('Clean Orphaned Modules'))
+        clean_btn.connect('clicked', self.on_clean_orphans)
+        header.pack_start(clean_btn)
 
         refresh_btn = Gtk.Button()
         refresh_btn.set_icon_name('view-refresh-symbolic')
@@ -61,10 +79,15 @@ class MainWindow(Adw.ApplicationWindow):
         menu_btn = Gtk.MenuButton()
         menu_btn.set_icon_name('open-menu-symbolic')
         menu = Gio.Menu()
+        menu.append(_('Clean Orphaned Modules'), 'win.clean_orphans')
         menu.append(_('About Kernel Manager'), 'app.about')
         menu_btn.set_menu_model(menu)
         menu_btn.set_primary(True)
         header.pack_end(menu_btn)
+
+        action = Gio.SimpleAction.new('clean_orphans', None)
+        action.connect('activate', lambda *a: self.on_clean_orphans(None))
+        self.add_action(action)
 
         toolbar_view.add_top_bar(header)
 
@@ -104,14 +127,16 @@ class MainWindow(Adw.ApplicationWindow):
             kernels = discover_kernels()
             pkg = get_active_kernel_pkg()
             ver = get_active_kernel_version()
-            GLib.idle_add(self._on_kernels_loaded, kernels, pkg, ver)
+            default_k = get_default_boot_kernel()
+            GLib.idle_add(self._on_kernels_loaded, kernels, pkg, ver, default_k)
         except Exception as e:
             GLib.idle_add(self._on_load_error, str(e))
 
-    def _on_kernels_loaded(self, kernels, pkg, ver):
+    def _on_kernels_loaded(self, kernels, pkg, ver, default_k):
         self.kernels = kernels
         self.active_kernel_pkg = pkg
         self.active_kernel_version = ver
+        self.default_boot_kernel = default_k
 
         toolbar_view = self.toast_overlay.get_child()
         if toolbar_view:
@@ -150,18 +175,20 @@ class MainWindow(Adw.ApplicationWindow):
         self._scrolled_window.set_vexpand(True)
 
         clamp = Adw.Clamp()
-        clamp.set_maximum_size(1200)
-        clamp.set_tightening_threshold(800)
+        clamp.set_maximum_size(1100)
 
         main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        main_box.set_spacing(32)
-        main_box.set_margin_top(36)
-        main_box.set_margin_bottom(36)
+        main_box.set_spacing(24)
+        main_box.set_margin_top(24)
+        main_box.set_margin_bottom(28)
         main_box.set_margin_start(18)
         main_box.set_margin_end(18)
 
         banner_content = self._create_banner()
         main_box.append(banner_content)
+
+        search_filter_content = self._create_search_and_filter_bar()
+        main_box.append(search_filter_content)
 
         kernels_content = self._build_kernels_section()
         main_box.append(kernels_content)
@@ -170,78 +197,107 @@ class MainWindow(Adw.ApplicationWindow):
         self._scrolled_window.set_child(clamp)
 
         return self._scrolled_window
-    
+
     def _create_banner(self):
-        banner_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        banner_box.set_spacing(18)
-        banner_box.set_halign(Gtk.Align.CENTER)
+        group = Adw.PreferencesGroup()
+        row = Adw.ActionRow()
+        row.set_title(_('Currently Booted Kernel'))
+        if self.active_kernel_pkg:
+            row.set_subtitle(f'{self.active_kernel_pkg} ({self.active_kernel_version})')
+        else:
+            row.set_subtitle(self.active_kernel_version)
 
         icon = Gtk.Image.new_from_icon_name('emblem-default-symbolic')
-        icon.set_pixel_size(48)
-        icon.add_css_class('success')
-        banner_box.append(icon)
+        icon.set_pixel_size(24)
+        row.add_prefix(icon)
 
-        text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        text_box.set_spacing(6)
+        badge = Gtk.Label(label=_('Running'))
+        badge.add_css_class('accent')
+        row.add_suffix(badge)
 
-        title = Gtk.Label()
-        title.set_markup('<span size="x-large" weight="bold">Currently Running</span>')
-        title.set_halign(Gtk.Align.START)
-        text_box.append(title)
+        group.add(row)
+        return group
 
-        if self.active_kernel_pkg:
-            kernel_label = Gtk.Label(label=f'{self.active_kernel_pkg} ({self.active_kernel_version})')
-        else:
-            kernel_label = Gtk.Label(label=self.active_kernel_version)
-        
-        kernel_label.set_halign(Gtk.Align.START)
-        kernel_label.add_css_class('dim-label')
-        kernel_label.set_ellipsize(Pango.EllipsizeMode.END)
-        text_box.append(kernel_label)
+    def _create_search_and_filter_bar(self):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.set_spacing(12)
 
-        banner_box.append(text_box)
+        # Search Bar
+        search_entry = Gtk.SearchEntry()
+        search_entry.set_placeholder_text(_('Search kernel packages by name, version, or description...'))
+        search_entry.set_text(self.search_query)
+        search_entry.connect('search-changed', self._on_search_changed)
+        box.append(search_entry)
 
-        frame = Gtk.Frame()
-        frame.set_child(banner_box)
-        frame.set_margin_start(12)
-        frame.set_margin_end(12)
+        # Filter buttons box
+        filter_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        filter_box.set_spacing(8)
+        filter_box.set_halign(Gtk.Align.START)
 
-        return frame
+        filters = [
+            ('all', _('All')),
+            ('installed', _('Installed')),
+            ('available', _('Available')),
+            ('lts', _('LTS')),
+            ('performance', _('Zen / RT')),
+        ]
+
+        for fid, flabel in filters:
+            btn = Gtk.ToggleButton(label=flabel)
+            if self.active_filter == fid:
+                btn.set_active(True)
+                btn.add_css_class('suggested-action')
+            btn.connect('toggled', self._on_filter_toggled, fid)
+            filter_box.append(btn)
+
+        box.append(filter_box)
+        return box
+
+    def _on_search_changed(self, entry):
+        self.search_query = entry.get_text().strip().lower()
+        self.refresh_kernels()
+
+    def _on_filter_toggled(self, button, fid):
+        if button.get_active():
+            self.active_filter = fid
+            self.refresh_kernels()
 
     def _build_kernels_section(self):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         box.set_spacing(24)
 
-        if not self.kernels:
+        filtered = self._filter_kernels(self.kernels)
+
+        if not filtered:
             empty_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
             empty_box.set_spacing(16)
             empty_box.set_halign(Gtk.Align.CENTER)
             empty_box.set_valign(Gtk.Align.CENTER)
-            empty_box.set_margin_top(48)
+            empty_box.set_margin_top(36)
             
-            icon = Gtk.Image.new_from_icon_name('computer-fail-symbolic')
-            icon.set_pixel_size(64)
+            icon = Gtk.Image.new_from_icon_name('system-search-symbolic')
+            icon.set_pixel_size(56)
             empty_box.append(icon)
             
             title = Gtk.Label()
-            title.set_markup('<span size="x-large" weight="bold">No Kernels Available</span>')
+            title.set_markup('<span size="large" weight="bold">No Kernels Match Your Filter</span>')
             empty_box.append(title)
             
-            desc = Gtk.Label(label=_('Could not find any kernel packages in your repositories'))
+            desc = Gtk.Label(label=_('Try adjusting your search term or filter category'))
             desc.add_css_class('dim-label')
             empty_box.append(desc)
             
             return empty_box
 
-        installed_kernels = [k for k in self.kernels if k.installed]
-        available_kernels = [k for k in self.kernels if not k.installed]
+        installed_kernels = [k for k in filtered if k.installed]
+        available_kernels = [k for k in filtered if not k.installed]
 
         if installed_kernels:
             installed_label = Gtk.Label()
-            installed_label.set_markup('<span size="x-large" weight="bold">Installed</span>')
+            installed_label.set_markup('<span size="large" weight="bold">Installed Kernels</span>')
             installed_label.set_halign(Gtk.Align.START)
-            installed_label.set_margin_start(6)
-            installed_label.set_margin_bottom(12)
+            installed_label.set_margin_start(4)
+            installed_label.set_margin_bottom(8)
             box.append(installed_label)
 
             installed_group = Adw.PreferencesGroup()
@@ -251,11 +307,11 @@ class MainWindow(Adw.ApplicationWindow):
 
         if available_kernels:
             available_label = Gtk.Label()
-            available_label.set_markup('<span size="x-large" weight="bold">Available</span>')
+            available_label.set_markup('<span size="large" weight="bold">Available Kernels</span>')
             available_label.set_halign(Gtk.Align.START)
-            available_label.set_margin_start(6)
+            available_label.set_margin_start(4)
             available_label.set_margin_top(12 if installed_kernels else 0)
-            available_label.set_margin_bottom(12)
+            available_label.set_margin_bottom(8)
             box.append(available_label)
 
             available_group = Adw.PreferencesGroup()
@@ -264,6 +320,33 @@ class MainWindow(Adw.ApplicationWindow):
             box.append(available_group)
 
         return box
+
+    def _filter_kernels(self, kernels):
+        res = []
+        for k in kernels:
+            # Category filter
+            if self.active_filter == 'installed' and not k.installed:
+                continue
+            elif self.active_filter == 'available' and k.installed:
+                continue
+            elif self.active_filter == 'lts' and 'lts' not in k.name.lower():
+                continue
+            elif self.active_filter == 'performance' and not ('zen' in k.name.lower() or 'rt' in k.name.lower()):
+                continue
+
+            # Search query
+            if self.search_query:
+                q = self.search_query
+                match = (
+                    q in k.name.lower() or
+                    q in k.version.lower() or
+                    q in k.description.lower()
+                )
+                if not match:
+                    continue
+
+            res.append(k)
+        return res
 
     def _create_kernel_row(self, kernel):
         row = Adw.ActionRow()
@@ -275,33 +358,39 @@ class MainWindow(Adw.ApplicationWindow):
             row.set_subtitle(kernel.version)
 
         is_active = kernel.name == self.active_kernel_pkg
-        
-        icon_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        icon_box.set_valign(Gtk.Align.CENTER)
+        is_default = self.default_boot_kernel and (kernel.name in self.default_boot_kernel or self.default_boot_kernel in kernel.name)
         
         if is_active:
-            icon = Gtk.Image.new_from_icon_name('object-select-symbolic')
-            icon.add_css_class('success')
-            icon.set_pixel_size(32)
+            icon = Gtk.Image.new_from_icon_name('emblem-ok-symbolic')
         else:
             icon = Gtk.Image.new_from_icon_name('drive-harddisk-symbolic')
-            icon.set_pixel_size(28)
-        
-        icon_box.append(icon)
-        row.add_prefix(icon_box)
+        icon.set_pixel_size(24)
+        row.add_prefix(icon)
 
         suffix_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        suffix_box.set_spacing(12)
+        suffix_box.set_spacing(8)
         suffix_box.set_valign(Gtk.Align.CENTER)
 
-        if kernel.installed:
-            if is_active:
-                badge = Gtk.Label(label=_('ACTIVE'))
-                badge.add_css_class('success')
-                badge.add_css_class('heading')
-                badge.set_margin_end(6)
-                suffix_box.append(badge)
+        if is_active:
+            badge = Gtk.Label(label=_('Active'))
+            badge.add_css_class('accent')
+            suffix_box.append(badge)
 
+        if is_default:
+            badge = Gtk.Label(label=_('Default'))
+            badge.add_css_class('dim-label')
+            suffix_box.append(badge)
+
+        # Details button
+        details_btn = Gtk.Button()
+        details_btn.set_icon_name('dialog-information-symbolic')
+        details_btn.set_tooltip_text(_('View Details'))
+        details_btn.add_css_class('flat')
+        details_btn.connect('clicked', lambda b: self._show_kernel_details(kernel, is_active, is_default))
+        suffix_box.append(details_btn)
+
+
+        if kernel.installed:
             installed_count = sum(1 for k in self.kernels if k.installed)
             if not is_active and installed_count > 1:
                 btn = Gtk.Button(label=_('Remove'))
@@ -318,6 +407,31 @@ class MainWindow(Adw.ApplicationWindow):
 
         row.add_suffix(suffix_box)
         return row
+
+    def _show_kernel_details(self, kernel, is_active, is_default):
+        dialog = KernelDetailsDialog(self, kernel, is_active, is_default, self._on_set_default_kernel)
+        dialog.present()
+
+    def _on_set_default_kernel(self, kernel):
+        # Set default bootloader kernel
+        cmd = ['pkexec', 'bootctl', 'set-default', f'{kernel.name}.conf']
+        try:
+            res = subprocess.run(cmd, capture_output=True, timeout=10)
+            if res.returncode == 0:
+                self.show_toast(_('Set {} as default boot kernel!').format(kernel.name))
+                self.refresh_kernels()
+            else:
+                # Try GRUB fallback
+                cmd_grub = ['pkexec', 'grub-set-default', kernel.name]
+                subprocess.run(cmd_grub, timeout=10)
+                self.show_toast(_('Set {} as default boot kernel!').format(kernel.name))
+                self.refresh_kernels()
+        except Exception as e:
+            self.show_toast(_('Failed to set default kernel: {}').format(e))
+
+    def on_clean_orphans(self, button):
+        dialog = OrphanCleanerDialog(self, self.kernels, self.refresh_kernels)
+        dialog.present()
 
     def on_install_kernel(self, button, kernel):
         dialog = Adw.AlertDialog.new(
@@ -425,18 +539,30 @@ class MainWindow(Adw.ApplicationWindow):
             kernels = discover_kernels()
             pkg = get_active_kernel_pkg()
             ver = get_active_kernel_version()
-            GLib.idle_add(self._update_kernels, kernels, pkg, ver)
+            default_k = get_default_boot_kernel()
+            GLib.idle_add(self._update_kernels, kernels, pkg, ver, default_k)
         except Exception as e:
             GLib.idle_add(self.show_toast, _('Refresh failed: {}').format(e))
 
-    def _update_kernels(self, kernels, pkg, ver):
+    def _update_kernels(self, kernels, pkg, ver, default_k):
+        scroll_val = 0
+        if self._scrolled_window:
+            vadj = self._scrolled_window.get_vadjustment()
+            if vadj:
+                scroll_val = vadj.get_value()
+
         self.kernels = kernels
         self.active_kernel_pkg = pkg
         self.active_kernel_version = ver
+        self.default_boot_kernel = default_k
 
         toolbar_view = self.toast_overlay.get_child()
         if toolbar_view:
             toolbar_view.set_content(self.create_main_content())
+            if self._scrolled_window and scroll_val > 0:
+                vadj = self._scrolled_window.get_vadjustment()
+                if vadj:
+                    GLib.idle_add(lambda: vadj.set_value(scroll_val) or False)
 
     def show_toast(self, message):
         toast = Adw.Toast(title=message)
@@ -458,18 +584,39 @@ class MainWindow(Adw.ApplicationWindow):
             self.show_toast(_('Kernel compilation failed or was cancelled'))
 
     def on_about(self, action, param):
+        release_notes = _(
+            "<p>Parch Kernel Manager 1.1.0 release notes:</p>"
+            "<ul>"
+            "<li>Default Bootloader Kernel Selector (GRUB and systemd-boot)</li>"
+            "<li>Extended Kernel Specifications and DKMS Inspector</li>"
+            "<li>System Module Cleaner for orphaned /usr/lib/modules/ directories</li>"
+            "<li>Search and Category Filtering (All, Installed, Available, LTS, Zen/RT)</li>"
+            "<li>Custom Kernel Compilation Presets (Gaming and Low-Latency, Battery Saver)</li>"
+            "<li>Native Gettext Localization and Persian (fa) Language Support</li>"
+            "<li>GNOME HIG and LibAdwaita UI Revamp</li>"
+            "</ul>"
+        )
+
         about = Adw.AboutDialog(
             application_name=_('Parch Kernel Manager'),
             application_icon='com.parchlinux.kernelmanager',
             developer_name=_('Parch GNU/Linux Team'),
-            version='1.0.0',
+            version='1.1.0',
             developers=['Parch Linux Developers'],
             copyright='\u00a9 2026 Parch GNU/Linux',
             license_type=Gtk.License.AGPL_3_0,
             website='https://parchlinux.com',
             issue_url='https://github.com/parchlinux/pkm/issues',
         )
+        try:
+            about.set_release_notes(release_notes)
+            about.set_release_notes_version('1.1.0')
+        except Exception:
+            pass
+
         about.present(self)
+
+
 
     def on_close_request(self, window):
         if self._force_close:
